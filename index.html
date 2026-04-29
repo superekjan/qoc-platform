@@ -3,304 +3,536 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>监控仪表盘 - 湖北QoC平台</title>
+    <title>湖北QoC平台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <link rel="stylesheet" href="components/module.css">
     <style>
-        .dashboard-header {
+        :root {
+            --bg-primary: #050810;
+            --bg-secondary: #0a0f1a;
+            --bg-tertiary: #0d1526;
+            --bg-card: rgba(10, 20, 40, 0.8);
+            --bg-card-hover: rgba(15, 30, 60, 0.9);
+            --border-color: rgba(0, 200, 255, 0.15);
+            --border-glow: rgba(0, 200, 255, 0.4);
+            --text-primary: #e8f4ff;
+            --text-secondary: #7aa2cc;
+            --text-muted: #4a6a8a;
+            --accent-cyan: #00d4ff;
+            --accent-blue: #0088ff;
+            --accent-purple: #a855f7;
+            --accent-green: #00ff88;
+            --accent-yellow: #ffd000;
+            --accent-red: #ff3366;
+            --glow-cyan: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .layout {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 32px;
+            min-height: 100vh;
         }
-        .page-info {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
+
+        .sidebar {
+            width: 260px;
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            border-right: 1px solid var(--border-color);
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            overflow-y: auto;
+            z-index: 100;
         }
-        .page-desc {
-            font-size: 13px;
-            color: var(--text-muted);
-            max-width: 700px;
-            line-height: 1.6;
-        }
-        .time-display {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--accent-cyan);
-            background: rgba(0, 212, 255, 0.08);
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-        .chart-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 24px;
-            margin-bottom: 24px;
-        }
-        .chart-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 24px;
-            position: relative;
-            overflow: hidden;
-        }
-        .chart-card::before {
+
+        .sidebar::before {
             content: '';
             position: absolute;
             top: 0;
-            left: 0;
             right: 0;
+            width: 1px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--accent-cyan), transparent 50%);
+            opacity: 0.5;
+        }
+
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-track { background: transparent; }
+        .sidebar::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+
+        .logo {
+            padding: 28px 24px;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .logo::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 24px;
+            right: 24px;
             height: 1px;
             background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
-            opacity: 0.6;
         }
-        .chart-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
+
+        .logo h1 {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 1px;
         }
-        .chart-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-        .chart-container {
-            height: 280px;
-        }
-        .status-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-        }
-        .status-item {
-            padding: 16px;
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-        }
-        .status-label {
+
+        .logo span {
             font-size: 11px;
             color: var(--text-muted);
-            margin-bottom: 8px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
         }
-        .status-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 24px;
-            font-weight: 700;
+
+        .nav-section {
+            padding: 16px 12px;
+            border-bottom: 1px solid var(--border-color);
         }
-        .status-value.green { color: var(--accent-green); }
-        .status-value.yellow { color: var(--accent-yellow); }
-        .status-value.red { color: var(--accent-red); }
-        .alert-list {
+
+        .nav-section:last-child { border-bottom: none; }
+
+        .nav-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 12px;
+            cursor: pointer;
             display: flex;
-            flex-direction: column;
-            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            transition: color 0.2s;
         }
-        .alert-item {
+
+        .nav-section-title:hover { color: var(--text-secondary); }
+
+        .nav-section-title svg {
+            width: 14px;
+            height: 14px;
+            transition: transform 0.2s;
+        }
+
+        .nav-section-title.expanded svg { transform: rotate(90deg); }
+
+        .nav-items {
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.3s ease;
+        }
+
+        .nav-section.expanded .nav-items { max-height: 500px; }
+
+        .nav-item {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 12px 16px;
-            background: rgba(255, 51, 102, 0.05);
-            border-radius: 10px;
-            border-left: 3px solid var(--accent-red);
-        }
-        .alert-item.warning {
-            background: rgba(255, 208, 0, 0.05);
-            border-color: var(--accent-yellow);
-        }
-        .alert-icon {
-            width: 32px;
-            height: 32px;
+            padding: 10px 12px;
             border-radius: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(0, 136, 255, 0.15));
+            color: var(--accent-cyan);
+            border: 1px solid var(--border-glow);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .nav-item .icon {
+            width: 20px;
+            height: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        .alert-icon.danger {
-            background: rgba(255, 51, 102, 0.15);
-        }
-        .alert-icon.warning {
-            background: rgba(255, 208, 0, 0.15);
-        }
-        .alert-icon svg {
-            width: 16px;
-            height: 16px;
+
+        .nav-item .icon svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
             stroke-width: 1.5;
             fill: none;
         }
-        .alert-icon.danger svg { stroke: var(--accent-red); }
-        .alert-icon.warning svg { stroke: var(--accent-yellow); }
-        .alert-info { flex: 1; }
-        .alert-name {
+
+        .badge {
+            margin-left: auto;
+            background: var(--accent-red);
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+
+        .main-wrapper {
+            flex: 1;
+            margin-left: 260px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .header-left h2 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-menu {
+            position: relative;
+        }
+
+        .user-trigger {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .user-trigger:hover { background: var(--bg-tertiary); }
+
+        .user-trigger svg {
+            width: 16px;
+            height: 16px;
+            stroke: var(--text-muted);
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .user-info { display: flex; flex-direction: column; }
+
+        .user-name {
             font-size: 13px;
             font-weight: 500;
             color: var(--text-primary);
-            margin-bottom: 2px;
         }
-        .alert-desc {
+
+        .user-role {
             font-size: 11px;
             color: var(--text-muted);
         }
-        .grid-pattern {
-            position: fixed;
-            top: 0;
-            left: 0;
+
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
             right: 0;
-            bottom: 0;
-            background:
-                linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-                linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px);
-            background-size: 50px 50px;
-            pointer-events: none;
-            z-index: 0;
+            margin-top: 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px;
+            min-width: 180px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.2s;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
         }
-        .content {
-            padding: 32px;
-            position: relative;
-            z-index: 1;
+
+        .user-dropdown.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
         }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .dropdown-item.danger:hover {
+            background: rgba(255, 51, 102, 0.1);
+            color: var(--accent-red);
+        }
+
+        .dropdown-item svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 8px 0;
+        }
+
+        .content-frame {
+            flex: 1;
+            background: var(--bg-primary);
+            overflow: hidden;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-cyan); }
     </style>
 </head>
 <body>
-    <div class="content">
-        <div class="grid-pattern"></div>
-        <div class="dashboard-header">
-            <div class="page-info">
-                <div class="section-title">监控仪表盘</div>
-                <div class="page-desc">概览 | 实时监控湖北QoC平台网络运行状态，汇聚全网OLT设备、光猫终端、CDN节点等关键指标数据</div>
+    <div class="layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="logo">
+                <h1>HUBEI QoC</h1>
+                <span>城域网质量分析系统</span>
             </div>
-            <div class="time-display" id="currentTime">2024-04-28 14:32:18</div>
-        </div>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-title">OLT设备总数</div>
-                    <div class="stat-icon blue"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+
+            <nav class="nav-section expanded">
+                <div class="nav-section-title">概览</div>
+                <div class="nav-items">
+                    <a href="module.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span>监控仪表盘</a>
                 </div>
-                <div class="stat-value">1,284</div>
-                <div class="stat-change up">↑ 23 较上月</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-title">在线光猫数</div>
-                    <div class="stat-icon green"><svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></div>
+            </nav>
+
+            <nav class="nav-section expanded">
+                <div class="nav-section-title">终端与设备分析</div>
+                <div class="nav-items">
+                    <a href="module1.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>OLT协同适配</a>
+                    <a href="module3.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>OLT隐患监测<span class="badge">12</span></a>
+                    <a href="module5.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>OLT快速处置</a>
                 </div>
-                <div class="stat-value">2,834,156</div>
-                <div class="stat-change up">↑ 1,258</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-title">CDN节点总数</div>
-                    <div class="stat-icon cyan"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div>
+            </nav>
+
+            <nav class="nav-section expanded">
+                <div class="nav-section-title">业务质量分析</div>
+                <div class="nav-items">
+                    <a href="module2.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></span>CDN业务分析</a>
+                    <a href="module6.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></span>业务不可用诊断</a>
                 </div>
-                <div class="stat-value">156</div>
-                <div class="stat-change up">↑ 8 新增</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-title">今日预警数</div>
-                    <div class="stat-icon yellow"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+            </nav>
+
+            <nav class="nav-section expanded">
+                <div class="nav-section-title">故障处理</div>
+                <div class="nav-items">
+                    <a href="module4.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>光宽智能溯源</a>
+                    <a href="module7.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>家庭内网故障</a>
+                    <a href="module9.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>网络不稳定溯源</a>
                 </div>
-                <div class="stat-value">42</div>
-                <div class="stat-change down">↓ 8 已优化</div>
-            </div>
-        </div>
-        <div class="chart-grid">
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div class="chart-title">流量趋势</div>
+            </nav>
+
+            <nav class="nav-section expanded">
+                <div class="nav-section-title">网络优化</div>
+                <div class="nav-items">
+                    <a href="module8.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></span>时延数字孪生</a>
+                    <a href="module10.html" class="nav-item" target="contentFrame"><span class="icon"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>用户满意度优化</a>
                 </div>
-                <div class="chart-container" id="trendChart"></div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div class="chart-title">设备状态分布</div>
+            </nav>
+        </aside>
+
+        <div class="main-wrapper">
+            <header class="header" id="pageHeader">
+                <div class="header-left">
+                    <h2 id="page-title">监控仪表盘</h2>
+                    <span id="page-subtitle" style="color: var(--text-muted); font-size: 12px; letter-spacing: 1px;">实时监测 · 数据分析 · 预警处置</span>
                 </div>
-                <div class="chart-container" id="statusChart"></div>
-            </div>
-        </div>
-        <div class="chart-grid">
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div class="chart-title">实时预警列表</div>
-                </div>
-                <div class="alert-list">
-                    <div class="alert-item">
-                        <div class="alert-icon danger"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
-                        <div class="alert-info">
-                            <div class="alert-name">武汉-洪山-HW-OLT01 光模块异常</div>
-                            <div class="alert-desc">检测到光功率低于阈值，可能影响服务质量</div>
+                <div class="header-right">
+                    <div class="user-menu" id="userMenu">
+                        <div class="user-trigger" id="userTrigger">
+                            <div class="user-avatar" id="userAvatar">A</div>
+                            <div class="user-info">
+                                <div class="user-name" id="userName">管理员</div>
+                                <div class="user-role" id="userRole">系统管理员</div>
+                            </div>
+                            <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                         </div>
-                        <div style="font-size: 11px; color: var(--text-muted);">10分钟前</div>
-                    </div>
-                    <div class="alert-item warning">
-                        <div class="alert-icon warning"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-                        <div class="alert-info">
-                            <div class="alert-name">襄阳-樊城-ZTE-OLT02 温度预警</div>
-                            <div class="alert-desc">设备温度持续偏高，建议检查散热系统</div>
+                        <div class="user-dropdown" id="userDropdown">
+                            <a href="#" class="dropdown-item">
+                                <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                个人中心
+                            </a>
+                            <a href="#" class="dropdown-item">
+                                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                                账户设置
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="login.html" class="dropdown-item danger" id="logoutBtn">
+                                <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                                退出登录
+                            </a>
                         </div>
-                        <div style="font-size: 11px; color: var(--text-muted);">25分钟前</div>
                     </div>
                 </div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div class="chart-title">关键指标</div>
-                </div>
-                <div class="status-grid">
-                    <div class="status-item">
-                        <div class="status-label">网络质量指数</div>
-                        <div class="status-value green">98.6</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-label">平均时延</div>
-                        <div class="status-value green">12ms</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-label">丢包率</div>
-                        <div class="status-value green">0.02%</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-label">设备在线率</div>
-                        <div class="status-value green">99.8%</div>
-                    </div>
-                </div>
+            </header>
+            <div class="content-frame">
+                <iframe name="contentFrame" id="contentFrame" src="module.html"></iframe>
             </div>
         </div>
     </div>
+
     <script>
-        const trendChart = echarts.init(document.getElementById('trendChart'));
-        trendChart.setOption({
-            backgroundColor: 'transparent',
-            tooltip: { trigger: 'axis', backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } },
-            grid: { top: 20, right: 20, bottom: 30, left: 50 },
-            xAxis: { type: 'category', data: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'], axisLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }, axisLabel: { color: '#4a6a8a' } },
-            yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(0,212,255,0.05)' } }, axisLabel: { show: false } },
-            series: [
-                { name: '入口流量', type: 'line', data: [820, 932, 901, 1234, 1290, 1530, 1420], smooth: true, symbol: 'circle', symbolSize: 8, lineStyle: { color: '#00d4ff', width: 2 }, itemStyle: { color: '#00d4ff', borderColor: '#0a0f1a', borderWidth: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(0,212,255,0.3)' }, { offset: 1, color: 'rgba(0,212,255,0.01)' }]) } },
-                { name: '出口流量', type: 'line', data: [620, 732, 791, 934, 1090, 1130, 1020], smooth: true, symbol: 'circle', symbolSize: 8, lineStyle: { color: '#00ff88', width: 2 }, itemStyle: { color: '#00ff88', borderColor: '#0a0f1a', borderWidth: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(0,255,136,0.2)' }, { offset: 1, color: 'rgba(0,255,136,0.01)' }]) } }
-            ]
+        const PAGE_CONFIG = {
+            'module.html': { title: '监控仪表盘', subtitle: '实时监测 · 数据分析 · 预警处置' },
+            'module1.html': { title: 'OLT协同适配分析', subtitle: '终端与设备分析' },
+            'module2.html': { title: 'CDN业务质量与流量分析', subtitle: '业务质量分析' },
+            'module3.html': { title: 'OLT隐患监测与地市派单整治', subtitle: '终端与设备分析' },
+            'module4.html': { title: '光宽智能溯源优化', subtitle: '故障处理' },
+            'module5.html': { title: 'OLT"1-5-10"快速处置能力提升', subtitle: '终端与设备分析' },
+            'module6.html': { title: '业务不可用时长精准诊断', subtitle: '业务质量分析' },
+            'module7.html': { title: '家庭内网故障特征库构建与精准派单', subtitle: '故障处理' },
+            'module8.html': { title: '城域网时延数字孪生构建', subtitle: '网络优化' },
+            'module9.html': { title: '网络不稳定问题溯源整治', subtitle: '故障处理' },
+            'module10.html': { title: '用户网络满意度优化提升', subtitle: '网络优化' }
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const navItems = sidebar.querySelectorAll('.nav-item');
+            const contentFrame = document.getElementById('contentFrame');
+            const pageTitle = document.getElementById('page-title');
+            const pageSubtitle = document.getElementById('page-subtitle');
+            const userAvatar = document.getElementById('userAvatar');
+            const userName = document.getElementById('userName');
+            const userRole = document.getElementById('userRole');
+
+            const savedUser = localStorage.getItem('qoc_user');
+            if (savedUser) {
+                const user = JSON.parse(savedUser);
+                userAvatar.textContent = user.avatar;
+                userName.textContent = user.name;
+                userRole.textContent = user.title;
+            }
+
+            function updateHeader(page) {
+                const config = PAGE_CONFIG[page] || PAGE_CONFIG['module.html'];
+                pageTitle.textContent = config.title;
+                pageSubtitle.innerHTML = config.subtitle;
+            }
+
+            navItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    const href = this.getAttribute('href');
+                    navItems.forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                    updateHeader(href);
+                });
+            });
+
+            navItems.forEach(item => {
+                if (item.getAttribute('href') === 'module.html') {
+                    item.classList.add('active');
+                }
+            });
+
+            document.querySelectorAll('.nav-section-title').forEach(title => {
+                title.addEventListener('click', () => {
+                    const section = title.parentElement;
+                    section.classList.toggle('expanded');
+                    title.classList.toggle('expanded');
+                });
+            });
+
+            const userMenu = document.getElementById('userMenu');
+            const userTrigger = document.getElementById('userTrigger');
+
+            userTrigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                userMenu.classList.toggle('open');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!userMenu.contains(e.target)) {
+                    userMenu.classList.remove('open');
+                }
+            });
+
+            const logoutBtn = document.getElementById('logoutBtn');
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (confirm('确定要退出登录吗？')) {
+                    localStorage.removeItem('qoc_user');
+                    window.location.href = 'login.html';
+                }
+            });
         });
-        const statusChart = echarts.init(document.getElementById('statusChart'));
-        statusChart.setOption({
-            backgroundColor: 'transparent',
-            tooltip: { trigger: 'item', backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } },
-            series: [{ type: 'pie', radius: ['45%', '70%'], avoidLabelOverlap: false, label: { show: false, position: 'center' }, labelLine: { show: false }, data: [{ value: 1278, name: '正常', itemStyle: { color: '#00ff88' } }, { value: 5, name: '告警', itemStyle: { color: '#ff3366' } }, { value: 1, name: '离线', itemStyle: { color: '#6b7280' } }] }]
-        });
-        window.addEventListener('resize', () => { trendChart.resize(); statusChart.resize(); });
-        function updateTime() {
-            const now = new Date();
-            const timeStr = now.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/\//g, '-');
-            document.getElementById('currentTime').textContent = timeStr;
-        }
-        setInterval(updateTime, 1000);
-        updateTime();
     </script>
 </body>
 </html>

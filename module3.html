@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OLT隐患监测与地市派单整治 - 湖北QoC平台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="components/module.css">
+    <style>
+        .page-desc { font-size: 13px; color: var(--text-muted); max-width: 700px; line-height: 1.6; }
+        .filter-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+        .filter-select { appearance: none; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 40px 12px 16px; color: var(--text-primary); font-size: 13px; font-family: 'Inter', sans-serif; outline: none; transition: all 0.3s; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234a6a8a' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+        .filter-select:hover { border-color: var(--border-glow); }
+        .filter-select:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+        .chart-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
+        .mini-chart-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; position: relative; overflow: hidden; transition: all 0.3s; }
+        .mini-chart-card:hover { border-color: var(--border-glow); box-shadow: var(--glow-cyan); }
+        .mini-chart-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent); }
+        .mini-chart-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+        .mini-chart-container { height: 100px; }
+        .table-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; overflow: hidden; }
+        .table-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 1px solid var(--border-color); background: rgba(0, 212, 255, 0.02); }
+        .table-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .action-btn { padding: 6px 12px; font-size: 11px; border-radius: 6px; background: rgba(0, 212, 255, 0.1); border: 1px solid var(--border-color); color: var(--accent-cyan); cursor: pointer; transition: all 0.2s; }
+        .action-btn:hover { background: rgba(0, 212, 255, 0.2); border-color: var(--accent-cyan); }
+        .action-btn.danger { background: rgba(255, 51, 102, 0.1); border-color: rgba(255, 51, 102, 0.3); color: var(--accent-red); }
+        .action-btn.danger:hover { background: rgba(255, 51, 102, 0.2); border-color: var(--accent-red); }
+        .action-btn.success { background: rgba(0, 255, 136, 0.1); border-color: rgba(0, 255, 136, 0.3); color: var(--accent-green); }
+        .action-btn.success:hover { background: rgba(0, 255, 136, 0.2); border-color: var(--accent-green); }
+        .danger-level { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; }
+        .danger-high { background: rgba(255, 51, 102, 0.15); color: var(--accent-red); }
+        .danger-mid { background: rgba(255, 208, 0, 0.15); color: var(--accent-yellow); }
+        .danger-low { background: rgba(0, 212, 255, 0.15); color: var(--accent-cyan); }
+        .region-stat { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--bg-primary); border-radius: 8px; margin-bottom: 8px; }
+        .region-name { font-size: 13px; color: var(--text-primary); }
+        .region-count { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; color: var(--accent-cyan); }
+        .order-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; }
+        .order-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        .order-id { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .order-time { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+        .order-content { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5; }
+        .order-footer { display: flex; justify-content: space-between; align-items: center; }
+        .order-region { font-size: 12px; color: var(--text-muted); }
+        .order-status { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; }
+        .status-pending { background: rgba(255, 208, 0, 0.15); color: var(--accent-yellow); }
+        .status-processing { background: rgba(0, 212, 255, 0.15); color: var(--accent-cyan); }
+        .status-resolved { background: rgba(0, 255, 136, 0.15); color: var(--accent-green); }
+        .progress-bar { width: 100%; height: 6px; background: rgba(0, 212, 255, 0.1); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+        .progress-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green)); }
+    </style>
+</head>
+<body>
+    <div class="content">
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">OLT设备总数</div>
+                    <div class="stat-icon blue"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+                </div>
+                <div class="stat-value">1,284</div>
+                <div class="stat-change">本月新增 12</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">隐患总数</div>
+                    <div class="stat-icon red"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+                </div>
+                <div class="stat-value">186</div>
+                <div class="stat-change down">↓ 23 已整治</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">待派单</div>
+                    <div class="stat-icon yellow"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+                </div>
+                <div class="stat-value">45</div>
+                <div class="stat-change">需及时处理</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">闭环率</div>
+                    <div class="stat-icon green"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                </div>
+                <div class="stat-value">85.3%</div>
+                <div class="stat-change up">↑ 5.2% 提升</div>
+            </div>
+        </div>
+
+        <div class="filter-row">
+            <select class="filter-select"><option>全部地市</option><option>武汉市</option><option>襄阳市</option><option>宜昌市</option><option>荆州市</option><option>黄石市</option></select>
+            <select class="filter-select"><option>隐患等级</option><option>严重</option><option>中等</option><option>轻微</option></select>
+            <select class="filter-select"><option>隐患类型</option><option>下挂率异常</option><option>链路隐患</option><option>设备故障</option></select>
+            <select class="filter-select"><option>处理状态</option><option>待派单</option><option>处理中</option><option>已闭环</option></select>
+        </div>
+
+        <div class="chart-row">
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">各地市隐患分布</div>
+                <div class="mini-chart-container" id="regionChart"></div>
+            </div>
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">隐患类型占比</div>
+                <div class="mini-chart-container" id="typeChart"></div>
+            </div>
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">月度整治趋势</div>
+                <div class="mini-chart-container" id="trendChart"></div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
+            <div class="table-card">
+                <div class="table-header">
+                    <div class="table-title">隐患清单与自排查方案</div>
+                    <button class="btn btn-sm">导出清单</button>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>隐患设备</th><th>隐患类型</th><th>等级</th><th>自排查方案</th><th>修复指引</th><th>状态</th><th>操作</th></tr></thead>
+                        <tbody>
+                            <tr><td>武汉-洪山-HW-OLT01</td><td>下挂率异常</td><td><span class="danger-level danger-high">严重</span></td><td><button class="action-btn">查看</button></td><td><button class="action-btn">查看</button></td><td><span class="status danger">待处理</span></td><td><button class="action-btn danger">派单</button></td></tr>
+                            <tr><td>襄阳-樊城-ZTE-OLT02</td><td>链路隐患</td><td><span class="danger-level danger-mid">中等</span></td><td><button class="action-btn">查看</button></td><td><button class="action-btn">查看</button></td><td><span class="status warning">处理中</span></td><td><button class="action-btn success">详情</button></td></tr>
+                            <tr><td>宜昌-西陵-FH-OLT03</td><td>设备故障</td><td><span class="danger-level danger-high">严重</span></td><td><button class="action-btn">查看</button></td><td><button class="action-btn">查看</button></td><td><span class="status normal">已闭环</span></td><td><button class="action-btn success">详情</button></td></tr>
+                            <tr><td>荆州-沙市-HW-OLT04</td><td>下挂率异常</td><td><span class="danger-level danger-mid">中等</span></td><td><button class="action-btn">查看</button></td><td><button class="action-btn">查看</button></td><td><span class="status warning">处理中</span></td><td><button class="action-btn success">详情</button></td></tr>
+                            <tr><td>黄石-黄石港-ZTE-OLT05</td><td>链路隐患</td><td><span class="danger-level danger-low">轻微</span></td><td><button class="action-btn">查看</button></td><td><button class="action-btn">查看</button></td><td><span class="status normal">已闭环</span></td><td><button class="action-btn success">详情</button></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div>
+                <div class="table-card" style="margin-bottom: 20px;">
+                    <div class="table-header">
+                        <div class="table-title">各地市隐患统计</div>
+                    </div>
+                    <div style="padding: 16px;">
+                        <div class="region-stat"><span class="region-name">武汉市</span><span class="region-count">42</span></div>
+                        <div class="region-stat"><span class="region-name">襄阳市</span><span class="region-count">35</span></div>
+                        <div class="region-stat"><span class="region-name">宜昌市</span><span class="region-count">28</span></div>
+                        <div class="region-stat"><span class="region-name">荆州市</span><span class="region-count">31</span></div>
+                        <div class="region-stat"><span class="region-name">黄石市</span><span class="region-count">18</span></div>
+                        <div class="region-stat"><span class="region-name">十堰市</span><span class="region-count">15</span></div>
+                        <div class="region-stat"><span class="region-name">其他地市</span><span class="region-count">17</span></div>
+                    </div>
+                </div>
+                <div class="order-card">
+                    <div class="order-header">
+                        <div class="order-id">工单 #OLT-2026-0428</div>
+                        <div class="order-time">2026-04-28 10:23</div>
+                    </div>
+                    <div class="order-content">武汉-洪山-HW-OLT01设备下挂率异常，当前值68%，超过阈值55%，需要紧急处理。</div>
+                    <div class="order-footer">
+                        <div class="order-region">武汉市</div>
+                        <span class="order-status status-pending">待派单</span>
+                    </div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const regionChart = echarts.init(document.getElementById('regionChart'));
+        regionChart.setOption({ backgroundColor: 'transparent', tooltip: { trigger: 'axis', backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, xAxis: { type: 'category', data: ['武汉', '襄阳', '宜昌', '荆州', '黄石'], axisLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }, axisLabel: { color: '#4a6a8a', fontSize: 10 } }, yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(0,212,255,0.05)' } }, axisLabel: { show: false } }, series: [{ type: 'bar', data: [42, 35, 28, 31, 18], itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#ff6b6b' }, { offset: 1, color: '#ff4757' }]), borderRadius: [4, 4, 0, 0] } }] });
+
+        const typeChart = echarts.init(document.getElementById('typeChart'));
+        typeChart.setOption({ backgroundColor: 'transparent', tooltip: { backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, series: [{ type: 'pie', radius: ['50%', '75%'], avoidLabelOverlap: false, label: { show: false }, data: [{ value: 72, name: '下挂率异常', itemStyle: { color: '#ff6b6b' } }, { value: 58, name: '链路隐患', itemStyle: { color: '#ffd700' } }, { value: 56, name: '设备故障', itemStyle: { color: '#00d4ff' } }] }] });
+
+        const trendChart = echarts.init(document.getElementById('trendChart'));
+        trendChart.setOption({ backgroundColor: 'transparent', tooltip: { trigger: 'axis', backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, xAxis: { type: 'category', data: ['1月', '2月', '3月', '4月'], axisLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }, axisLabel: { color: '#4a6a8a', fontSize: 10 } }, yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(0,212,255,0.05)' } }, axisLabel: { show: false } }, series: [{ type: 'line', data: [120, 98, 85, 65], smooth: true, symbol: 'none', lineStyle: { color: '#00ff88', width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(0,255,136,0.3)' }, { offset: 1, color: 'rgba(0,255,136,0)' }]) } }] });
+
+        window.addEventListener('resize', () => { regionChart.resize(); typeChart.resize(); trendChart.resize(); });
+    </script>
+</body>
+</html>

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>监控仪表盘 - 湖北QoC平台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="components/module.css">
+    <style>
+        .dashboard-header {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        .time-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--accent-cyan);
+            background: rgba(0, 212, 255, 0.08);
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+        .chart-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+            opacity: 0.6;
+        }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(180deg, var(--accent-cyan), var(--accent-blue));
+            border-radius: 2px;
+            box-shadow: var(--glow-cyan);
+        }
+        .chart-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .chart-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+            border-radius: 6px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .chart-btn:hover, .chart-btn.active {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+        .chart-container {
+            height: 280px;
+        }
+        .chart-container-pie {
+            height: 240px;
+        }
+        .grid-pattern {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                linear-gradient(90deg, rgba(0, 212, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(rgba(0, 212, 255, 0.02) 1px, transparent 1px);
+            background-size: 30px 30px;
+            pointer-events: none;
+        }
+        .rank-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .rank-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 16px;
+            background: rgba(0, 212, 255, 0.03);
+            border-radius: 10px;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+        }
+        .rank-item:hover {
+            border-color: var(--border-glow);
+            background: rgba(0, 212, 255, 0.08);
+            transform: translateX(4px);
+        }
+        .rank-num {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .rank-num.top1 { background: rgba(255, 208, 0, 0.2); color: var(--accent-yellow); }
+        .rank-num.top2 { background: rgba(0, 212, 255, 0.2); color: var(--accent-cyan); }
+        .rank-num.top3 { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); }
+        .rank-num.normal { background: rgba(74, 106, 138, 0.2); color: var(--text-muted); }
+        .rank-info {
+            flex: 1;
+        }
+        .rank-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+        .rank-detail {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .rank-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <div class="grid-pattern"></div>
+
+        <div class="dashboard-header">
+            <div class="page-info">
+                <div class="section-title">监控仪表盘</div>
+                <div class="page-desc">概览 | 实时监控湖北QoC平台网络运行状态，汇聚全网OLT设备、光猫终端、CDN节点等关键指标数据</div>
+            </div>
+            <div class="time-display" id="currentTime">2024-04-28 14:32:18</div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">OLT设备总数</div>
+                    <div class="stat-icon blue">
+                        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    </div>
+                </div>
+                <div class="stat-value">1,284</div>
+                <div class="stat-change up">↑ 12.5% 较上月</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">在网用户数</div>
+                    <div class="stat-icon cyan">
+                        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </div>
+                </div>
+                <div class="stat-value">856.2万</div>
+                <div class="stat-change up">↑ 8.3% 较上月</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">当日告警数</div>
+                    <div class="stat-icon yellow">
+                        <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
+                </div>
+                <div class="stat-value">156</div>
+                <div class="stat-change down">↓ 23.1% 较昨日</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">平均时延</div>
+                    <div class="stat-icon green">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                </div>
+                <div class="stat-value">8.6ms</div>
+                <div class="stat-change up">↓ 2.1ms 优化</div>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">流量趋势</div>
+                    <div class="chart-actions">
+                        <button class="chart-btn active">小时</button>
+                        <button class="chart-btn">日</button>
+                        <button class="chart-btn">周</button>
+                    </div>
+                </div>
+                <div class="chart-container" id="flowChart"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">地市故障分布</div>
+                </div>
+                <div class="chart-container-pie" id="regionChart"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">OLT设备健康度排行</div>
+                <a href="#" class="btn btn-sm">查看全部</a>
+            </div>
+            <div class="rank-list">
+                <div class="rank-item">
+                    <div class="rank-num top1">1</div>
+                    <div class="rank-info">
+                        <div class="rank-name">武汉-洪山-HW-OLT01</div>
+                        <div class="rank-detail">覆盖率 99.8% · 故障率 0.02%</div>
+                    </div>
+                    <div class="rank-value">98.6</div>
+                </div>
+                <div class="rank-item">
+                    <div class="rank-num top2">2</div>
+                    <div class="rank-info">
+                        <div class="rank-name">宜昌-西陵-ZTE-OLT02</div>
+                        <div class="rank-detail">覆盖率 99.5% · 故障率 0.05%</div>
+                    </div>
+                    <div class="rank-value">97.2</div>
+                </div>
+                <div class="rank-item">
+                    <div class="rank-num top3">3</div>
+                    <div class="rank-info">
+                        <div class="rank-name">襄阳-樊城-HW-OLT03</div>
+                        <div class="rank-detail">覆盖率 99.2% · 故障率 0.08%</div>
+                    </div>
+                    <div class="rank-value">96.8</div>
+                </div>
+                <div class="rank-item">
+                    <div class="rank-num normal">4</div>
+                    <div class="rank-info">
+                        <div class="rank-name">荆州-沙市-HW-OLT05</div>
+                        <div class="rank-detail">覆盖率 98.9% · 故障率 0.12%</div>
+                    </div>
+                    <div class="rank-value">95.4</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateTime() {
+            const now = new Date();
+            const formatted = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).replace(/\//g, '-');
+            document.getElementById('currentTime').textContent = formatted;
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        const flowChart = echarts.init(document.getElementById('flowChart'));
+        const flowOption = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'axis',
+                backgroundColor: 'rgba(10, 15, 26, 0.95)',
+                borderColor: 'rgba(0, 212, 255, 0.3)',
+                textStyle: { color: '#e8f4ff' }
+            },
+            grid: { left: '3%', right: '4%', bottom: '3%', top: '10%', containLabel: true },
+            xAxis: {
+                type: 'category',
+                boundaryGap: false,
+                data: ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
+                axisLine: { lineStyle: { color: 'rgba(0, 212, 255, 0.2)' } },
+                axisLabel: { color: '#4a6a8a', fontSize: 11 }
+            },
+            yAxis: {
+                type: 'value',
+                splitLine: { lineStyle: { color: 'rgba(0, 212, 255, 0.05)' } },
+                axisLabel: { color: '#4a6a8a', fontSize: 11 }
+            },
+            series: [
+                {
+                    name: '上行流量',
+                    type: 'line',
+                    smooth: true,
+                    symbol: 'none',
+                    lineStyle: { color: '#00d4ff', width: 2 },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(0, 212, 255, 0.3)' },
+                            { offset: 1, color: 'rgba(0, 212, 255, 0)' }
+                        ])
+                    },
+                    data: [120, 80, 60, 45, 90, 180, 250, 320, 280, 220, 180, 140]
+                },
+                {
+                    name: '下行流量',
+                    type: 'line',
+                    smooth: true,
+                    symbol: 'none',
+                    lineStyle: { color: '#0088ff', width: 2 },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(0, 136, 255, 0.3)' },
+                            { offset: 1, color: 'rgba(0, 136, 255, 0)' }
+                        ])
+                    },
+                    data: [200, 150, 100, 80, 160, 320, 450, 580, 520, 400, 320, 260]
+                }
+            ]
+        };
+        flowChart.setOption(flowOption);
+
+        const regionChart = echarts.init(document.getElementById('regionChart'));
+        const regionOption = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                backgroundColor: 'rgba(10, 15, 26, 0.95)',
+                borderColor: 'rgba(0, 212, 255, 0.3)',
+                textStyle: { color: '#e8f4ff' }
+            },
+            series: [{
+                type: 'pie',
+                radius: ['50%', '75%'],
+                center: ['50%', '50%'],
+                avoidLabelOverlap: false,
+                itemStyle: {
+                    borderRadius: 6,
+                    borderColor: '#050810',
+                    borderWidth: 2
+                },
+                label: { show: false },
+                emphasis: {
+                    label: { show: true, fontSize: 14, fontWeight: 'bold', color: '#e8f4ff' }
+                },
+                data: [
+                    { value: 35, name: '武汉', itemStyle: { color: '#00d4ff' } },
+                    { value: 20, name: '襄阳', itemStyle: { color: '#0088ff' } },
+                    { value: 18, name: '宜昌', itemStyle: { color: '#a855f7' } },
+                    { value: 15, name: '荆州', itemStyle: { color: '#00ff88' } },
+                    { value: 12, name: '其他', itemStyle: { color: '#4a6a8a' } }
+                ]
+            }]
+        };
+        regionChart.setOption(regionOption);
+
+        window.addEventListener('resize', () => {
+            flowChart.resize();
+            regionChart.resize();
+        });
+    </script>
+</body>
+</html>

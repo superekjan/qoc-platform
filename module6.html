@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光宽业务不可用时长精准诊断 - 湖北QoC平台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="components/module.css">
+    <style>
+        .page-desc { font-size: 13px; color: var(--text-muted); max-width: 700px; line-height: 1.6; }
+        .filter-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+        .filter-select { appearance: none; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 40px 12px 16px; color: var(--text-primary); font-size: 13px; font-family: 'Inter', sans-serif; outline: none; transition: all 0.3s; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234a6a8a' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+        .filter-select:hover { border-color: var(--border-glow); }
+        .filter-select:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+        .chart-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
+        .mini-chart-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; position: relative; overflow: hidden; transition: all 0.3s; }
+        .mini-chart-card:hover { border-color: var(--border-glow); box-shadow: var(--glow-cyan); }
+        .mini-chart-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent); }
+        .mini-chart-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+        .mini-chart-container { height: 100px; }
+        .table-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; overflow: hidden; }
+        .table-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 1px solid var(--border-color); background: rgba(0, 212, 255, 0.02); }
+        .table-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .action-btn { padding: 6px 12px; font-size: 11px; border-radius: 6px; background: rgba(0, 212, 255, 0.1); border: 1px solid var(--border-color); color: var(--accent-cyan); cursor: pointer; transition: all 0.2s; }
+        .action-btn:hover { background: rgba(0, 212, 255, 0.2); border-color: var(--accent-cyan); }
+        .heartbeat-status { display: flex; align-items: center; gap: 8px; }
+        .heartbeat-dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 1.5s infinite; }
+        .heartbeat-dot.online { background: var(--accent-green); box-shadow: 0 0 8px rgba(0, 255, 136, 0.5); }
+        .heartbeat-dot.offline { background: var(--accent-red); box-shadow: 0 0 8px rgba(255, 51, 102, 0.5); }
+        .heartbeat-dot.warning { background: var(--accent-yellow); box-shadow: 0 0 8px rgba(255, 208, 0, 0.5); }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .duration-bar { display: flex; align-items: center; gap: 10px; }
+        .duration-track { width: 100px; height: 8px; background: rgba(0, 212, 255, 0.1); border-radius: 4px; overflow: hidden; }
+        .duration-fill { height: 100%; border-radius: 4px; }
+        .duration-fill.green { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+        .duration-fill.yellow { background: linear-gradient(90deg, var(--accent-yellow), var(--accent-red)); }
+        .duration-value { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+        .compare-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; }
+        .compare-header { display: flex; justify-content: space-between; margin-bottom: 16px; }
+        .compare-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .compare-value { display: flex; align-items: baseline; gap: 8px; }
+        .compare-new { font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); }
+        .compare-old { font-size: 14px; color: var(--text-muted); text-decoration: line-through; }
+        .compare-change { font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+        .compare-change.positive { background: rgba(0, 255, 136, 0.15); color: var(--accent-green); }
+        .compare-change.negative { background: rgba(255, 51, 102, 0.15); color: var(--accent-red); }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">监测光猫总数</div>
+                    <div class="stat-icon blue"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+                </div>
+                <div class="stat-value">2,856,421</div>
+                <div class="stat-change">在线 2,834,156</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">今日不可用时长</div>
+                    <div class="stat-icon red"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
+                </div>
+                <div class="stat-value">0.023</div>
+                <div class="stat-unit">小时/户</div>
+                <div class="stat-change down">↓ 18.5%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">精准诊断准确率</div>
+                    <div class="stat-icon green"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                </div>
+                <div class="stat-value">98.6%</div>
+                <div class="stat-change up">↑ 1.2%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">提前预警数</div>
+                    <div class="stat-icon yellow"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></div>
+                </div>
+                <div class="stat-value">12,458</div>
+                <div class="stat-change up">↑ 2,320</div>
+            </div>
+        </div>
+
+        <div class="filter-row">
+            <select class="filter-select"><option>全部地市</option><option>武汉市</option><option>襄阳市</option><option>宜昌市</option><option>荆州市</option></select>
+            <select class="filter-select"><option>时间范围</option><option>今日</option><option>近7天</option><option>近30天</option></select>
+            <select class="filter-select"><option>诊断类型</option><option>全部</option><option>离线</option><option>心跳异常</option><option>速率异常</option></select>
+        </div>
+
+        <div class="chart-row">
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">不可用时长分布</div>
+                <div class="mini-chart-container" id="durationDistChart"></div>
+            </div>
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">心跳在线率</div>
+                <div class="mini-chart-container" id="heartbeatChart"></div>
+            </div>
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">诊断趋势对比</div>
+                <div class="mini-chart-container" id="trendCompareChart"></div>
+            </div>
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">预警类型分布</div>
+                <div class="mini-chart-container" id="alertTypeChart"></div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+            <div class="compare-card">
+                <div class="compare-header">
+                    <div class="compare-title">新旧算法对比 - 业务不可用时长</div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">旧算法 (网元级)</div>
+                        <div style="font-family: 'JetBrains Mono'; font-size: 32px; font-weight: 700; color: var(--accent-red);">0.089</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">小时/户</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">新算法 (光猫心跳)</div>
+                        <div style="font-family: 'JetBrains Mono'; font-size: 32px; font-weight: 700; color: var(--accent-cyan);">0.023</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">小时/户</div>
+                    </div>
+                </div>
+                <div style="margin-top: 16px; padding: 12px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; text-align: center;">
+                    <span style="color: var(--accent-green); font-size: 14px; font-weight: 600;">精准度提升 74.2%</span>
+                </div>
+            </div>
+            <div class="table-card">
+                <div class="table-header">
+                    <div class="table-title">光宽业务不可用诊断详情</div>
+                    <button class="btn btn-sm">导出数据</button>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>用户账号</th><th>心跳状态</th><th>诊断时长</th><th>不可用时长</th><th>诊断结果</th><th>操作</th></tr></thead>
+                        <tbody>
+                            <tr><td>027-8751****</td><td><div class="heartbeat-status"><span class="heartbeat-dot offline"></span>离线</div></td><td>14:25:32</td><td><span style="color: var(--accent-red);">2.5小时</span></td><td>光纤中断</td><td><button class="action-btn">详情</button></td></tr>
+                            <tr><td>0710-3562****</td><td><div class="heartbeat-status"><span class="heartbeat-dot warning"></span>异常</div></td><td>11:18:45</td><td><span style="color: var(--accent-yellow);">0.8小时</span></td><td>光猫重启</td><td><button class="action-btn">详情</button></td></tr>
+                            <tr><td>0717-2891****</td><td><div class="heartbeat-status"><span class="heartbeat-dot online"></span>在线</div></td><td>09:42:18</td><td><span style="color: var(--accent-green);">0.1小时</span></td><td>软件卡顿</td><td><button class="action-btn">详情</button></td></tr>
+                            <tr><td>0716-4521****</td><td><div class="heartbeat-status"><span class="heartbeat-dot offline"></span>离线</div></td><td>08:15:03</td><td><span style="color: var(--accent-red);">1.2小时</span></td><td>电源故障</td><td><button class="action-btn">详情</button></td></tr>
+                            <tr><td>027-1832****</td><td><div class="heartbeat-status"><span class="heartbeat-dot online"></span>在线</div></td><td>07:58:22</td><td><span style="color: var(--accent-green);">0.05小时</span></td><td>正常波动</td><td><button class="action-btn">详情</button></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-card">
+            <div class="table-header">
+                <div class="table-title">光猫心跳监测详情</div>
+                <button class="btn btn-sm">批量诊断</button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>光猫MAC</th><th>OLT设备</th><th>心跳间隔</th><th>最后在线</th><th>状态</th><th>历史不可用</th><th>操作</th></tr></thead>
+                    <tbody>
+                        <tr><td>00:E0:FC:12:34:56</td><td>武汉-洪山-HW-OLT01</td><td><span class="duration-value">30秒</span></td><td>14:32:15</td><td><span class="status normal">正常</span></td><td>0.5小时/月</td><td><button class="action-btn">详情</button></td></tr>
+                        <tr><td>00:E0:FC:78:90:AB</td><td>襄阳-樊城-ZTE-OLT02</td><td><span class="duration-value">28秒</span></td><td>14:32:12</td><td><span class="status normal">正常</span></td><td>0.3小时/月</td><td><button class="action-btn">详情</button></td></tr>
+                        <tr><td>00:E0:FC:34:56:78</td><td>宜昌-西陵-FH-OLT03</td><td><span class="duration-value" style="color: var(--accent-yellow);">65秒</span></td><td>14:31:50</td><td><span class="status warning">预警</span></td><td>2.1小时/月</td><td><button class="action-btn">诊断</button></td></tr>
+                        <tr><td>00:E0:FC:AB:CD:EF</td><td>荆州-沙市-HW-OLT04</td><td><span class="duration-value">31秒</span></td><td>14:32:18</td><td><span class="status normal">正常</span></td><td>0.2小时/月</td><td><button class="action-btn">详情</button></td></tr>
+                        <tr><td>00:E0:FC:EF:12:34</td><td>黄石-黄石港-ZTE-OLT05</td><td><span class="duration-value" style="color: var(--accent-red);">--</span></td><td>14:25:32</td><td><span class="status danger">离线</span></td><td>5.8小时/月</td><td><button class="action-btn">处置</button></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const durationDistChart = echarts.init(document.getElementById('durationDistChart'));
+        durationDistChart.setOption({ backgroundColor: 'transparent', tooltip: { trigger: 'axis', backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, xAxis: { type: 'category', data: ['<0.1h', '0.1-0.5h', '0.5-1h', '1-5h', '>5h'], axisLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }, axisLabel: { color: '#4a6a8a', fontSize: 10 } }, yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(0,212,255,0.05)' } }, axisLabel: { show: false } }, series: [{ type: 'bar', data: [2850, 1260, 580, 245, 32], itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#00ff88' }, { offset: 1, color: '#00d4ff' }]), borderRadius: [4, 4, 0, 0] } }] });
+
+        const heartbeatChart = echarts.init(document.getElementById('heartbeatChart'));
+        heartbeatChart.setOption({ backgroundColor: 'transparent', tooltip: { backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, series: [{ type: 'pie', radius: ['50%', '75%'], avoidLabelOverlap: false, label: { show: false }, data: [{ value: 98.6, name: '在线', itemStyle: { color: '#00ff88' } }, { value: 1.0, name: '心跳异常', itemStyle: { color: '#ffd700' } }, { value: 0.4, name: '离线', itemStyle: { color: '#ff6b6b' } }] }] });
+
+        const trendCompareChart = echarts.init(document.getElementById('trendCompareChart'));
+        trendCompareChart.setOption({ backgroundColor: 'transparent', tooltip: { trigger: 'axis', backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, xAxis: { type: 'category', data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'], axisLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }, axisLabel: { color: '#4a6a8a', fontSize: 10 } }, yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(0,212,255,0.05)' } }, axisLabel: { show: false } }, series: [{ name: '新算法', type: 'line', data: [0.032, 0.028, 0.025, 0.026, 0.024, 0.023, 0.023], smooth: true, symbol: 'none', lineStyle: { color: '#00d4ff', width: 2 } }, { name: '旧算法', type: 'line', data: [0.095, 0.092, 0.088, 0.090, 0.086, 0.092, 0.089], smooth: true, symbol: 'none', lineStyle: { color: '#ff6b6b', width: 2, type: 'dashed' } }] });
+
+        const alertTypeChart = echarts.init(document.getElementById('alertTypeChart'));
+        alertTypeChart.setOption({ backgroundColor: 'transparent', tooltip: { backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, series: [{ type: 'pie', radius: ['50%', '75%'], avoidLabelOverlap: false, label: { show: false }, data: [{ value: 42, name: '心跳超时', itemStyle: { color: '#ff6b6b' } }, { value: 28, name: '频繁重启', itemStyle: { color: '#ffd700' } }, { value: 18, name: '光衰异常', itemStyle: { color: '#00d4ff' } }, { value: 12, name: '速率异常', itemStyle: { color: '#00ff88' } }] }] });
+
+        window.addEventListener('resize', () => { durationDistChart.resize(); heartbeatChart.resize(); trendCompareChart.resize(); alertTypeChart.resize(); });
+    </script>
+</body>
+</html>

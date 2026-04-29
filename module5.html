@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OLT"1510"快速处置能力提升 - 湖北QoC平台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="components/module.css">
+    <style>
+        .page-desc { font-size: 13px; color: var(--text-muted); max-width: 700px; line-height: 1.6; }
+        .filter-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+        .filter-select { appearance: none; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 40px 12px 16px; color: var(--text-primary); font-size: 13px; font-family: 'Inter', sans-serif; outline: none; transition: all 0.3s; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234a6a8a' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+        .filter-select:hover { border-color: var(--border-glow); }
+        .filter-select:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+        .chart-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
+        .mini-chart-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; position: relative; overflow: hidden; transition: all 0.3s; }
+        .mini-chart-card:hover { border-color: var(--border-glow); box-shadow: var(--glow-cyan); }
+        .mini-chart-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent); }
+        .mini-chart-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+        .mini-chart-container { height: 100px; }
+        .table-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; overflow: hidden; }
+        .table-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 1px solid var(--border-color); background: rgba(0, 212, 255, 0.02); }
+        .table-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .action-btn { padding: 6px 12px; font-size: 11px; border-radius: 6px; background: rgba(0, 212, 255, 0.1); border: 1px solid var(--border-color); color: var(--accent-cyan); cursor: pointer; transition: all 0.2s; }
+        .action-btn:hover { background: rgba(0, 212, 255, 0.2); border-color: var(--accent-cyan); }
+        .action-btn.danger { background: rgba(255, 51, 102, 0.1); border-color: rgba(255, 51, 102, 0.3); color: var(--accent-red); }
+        .action-btn.success { background: rgba(0, 255, 136, 0.1); border-color: rgba(0, 255, 136, 0.3); color: var(--accent-green); }
+        .timeline-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 24px; }
+        .timeline { position: relative; padding-left: 30px; }
+        .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, var(--accent-cyan), var(--accent-green)); }
+        .timeline-item { position: relative; margin-bottom: 24px; }
+        .timeline-item:last-child { margin-bottom: 0; }
+        .timeline-dot { position: absolute; left: -26px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent-cyan); border: 2px solid var(--bg-card); box-shadow: 0 0 10px rgba(0, 212, 255, 0.5); }
+        .timeline-dot.success { background: var(--accent-green); box-shadow: 0 0 10px rgba(0, 255, 136, 0.5); }
+        .timeline-dot.warning { background: var(--accent-yellow); box-shadow: 0 0 10px rgba(255, 208, 0, 0.5); }
+        .timeline-time { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+        .timeline-title { font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 4px; }
+        .timeline-desc { font-size: 12px; color: var(--text-secondary); }
+        .target-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 500; }
+        .target-1 { background: rgba(0, 212, 255, 0.15); color: var(--accent-cyan); }
+        .target-5 { background: rgba(0, 255, 136, 0.15); color: var(--accent-green); }
+        .target-30 { background: rgba(255, 208, 0, 0.15); color: var(--accent-yellow); }
+        .time-meter { display: flex; align-items: center; gap: 16px; padding: 16px; background: var(--bg-primary); border-radius: 10px; margin-top: 12px; }
+        .time-label { font-size: 12px; color: var(--text-muted); }
+        .time-value { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600; color: var(--accent-cyan); }
+        .time-target { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+    </style>
+</head>
+<body>
+    <div class="content">
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">今日故障发现</div>
+                    <div class="stat-icon blue"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                </div>
+                <div class="stat-value">128</div>
+                <div class="stat-change up">↑ 23 较昨日</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">平均诊断时长</div>
+                    <div class="stat-icon cyan"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                </div>
+                <div class="stat-value">3.2</div>
+                <div class="stat-unit">分钟</div>
+                <div class="stat-change up">达标 ✓</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">平均解决时长</div>
+                    <div class="stat-icon green"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                </div>
+                <div class="stat-value">18.5</div>
+                <div class="stat-unit">分钟</div>
+                <div class="stat-change up">达标 ✓</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">达标率</div>
+                    <div class="stat-icon yellow"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+                </div>
+                <div class="stat-value">96.8%</div>
+                <div class="stat-change up">↑ 2.3%</div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+            <div class="target-badge target-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>1分钟发现</div>
+            <div class="target-badge target-5"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>5分钟诊断</div>
+            <div class="target-badge target-30"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>30分钟解决</div>
+        </div>
+
+        <div class="chart-row">
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">故障发现趋势</div>
+                <div class="mini-chart-container" id="discoverChart"></div>
+            </div>
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">诊断时长分布</div>
+                <div class="mini-chart-container" id="diagnoseChart"></div>
+            </div>
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">解决时长趋势</div>
+                <div class="mini-chart-container" id="resolveChart"></div>
+            </div>
+            <div class="mini-chart-card">
+                <div class="mini-chart-title">达标率趋势</div>
+                <div class="mini-chart-container" id="complianceChart"></div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+            <div class="table-card">
+                <div class="table-header">
+                    <div class="table-title">快速处置工单</div>
+                    <button class="btn btn-sm">导出报告</button>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>工单ID</th><th>故障设备</th><th>故障类型</th><th>发现-诊断</th><th>诊断-解决</th><th>总时长</th><th>状态</th><th>操作</th></tr></thead>
+                        <tbody>
+                            <tr><td>#1510-8921</td><td>武汉-洪山-HW-OLT01</td><td>光模块故障</td><td><span style="color: var(--accent-green);">0'45"</span></td><td><span style="color: var(--accent-green);">8'32"</span></td><td><span style="color: var(--accent-green);">9'17"</span></td><td><span class="status normal">已完成</span></td><td><button class="action-btn">详情</button></td></tr>
+                            <tr><td>#1510-8920</td><td>襄阳-樊城-ZTE-OLT02</td><td>链路中断</td><td><span style="color: var(--accent-cyan);">1'12"</span></td><td><span style="color: var(--accent-cyan);">15'28"</span></td><td><span style="color: var(--accent-cyan);">16'40"</span></td><td><span class="status normal">已完成</span></td><td><button class="action-btn">详情</button></td></tr>
+                            <tr><td>#1510-8919</td><td>宜昌-西陵-FH-OLT03</td><td>配置异常</td><td><span style="color: var(--accent-green);">0'38"</span></td><td><span style="color: var(--accent-yellow);">22'15"</span></td><td><span style="color: var(--accent-yellow);">22'53"</span></td><td><span class="status normal">已完成</span></td><td><button class="action-btn">详情</button></td></tr>
+                            <tr><td>#1510-8918</td><td>荆州-沙市-HW-OLT04</td><td>下挂率异常</td><td><span style="color: var(--accent-cyan);">0'52"</span></td><td><span style="color: var(--accent-cyan);">12'08"</span></td><td><span style="color: var(--accent-cyan);">13'00"</span></td><td><span class="status normal">已完成</span></td><td><button class="action-btn">详情</button></td></tr>
+                            <tr><td>#1510-8917</td><td>黄石-黄石港-ZTE-OLT05</td><td>电源故障</td><td><span style="color: var(--accent-cyan);">0'58"</span></td><td><span style="color: var(--accent-red);">35'42"</span></td><td><span style="color: var(--accent-red);">36'40"</span></td><td><span class="status warning">超时</span></td><td><button class="action-btn danger">复盘</button></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="timeline-card">
+                <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 20px;">处置流程追踪 #1510-8921</div>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-dot success"></div>
+                        <div class="timeline-time">14:32:15</div>
+                        <div class="timeline-title">故障发现</div>
+                        <div class="timeline-desc">系统自动检测到光模块异常告警</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot success"></div>
+                        <div class="timeline-time">14:32:45</div>
+                        <div class="timeline-title">故障诊断</div>
+                        <div class="timeline-desc">AI溯源定位为光模块老化导致的信号衰减</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot success"></div>
+                        <div class="timeline-time">14:35:20</div>
+                        <div class="timeline-title">方案生成</div>
+                        <div class="timeline-desc">自动生成更换光模块处置方案</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot success"></div>
+                        <div class="timeline-time">14:41:32</div>
+                        <div class="timeline-title">故障解决</div>
+                        <div class="timeline-desc">运维人员完成光模块更换，故障恢复</div>
+                    </div>
+                </div>
+                <div class="time-meter">
+                    <div><div class="time-label">总耗时</div><div class="time-value">9'17"</div></div>
+                    <div class="time-target">目标: 30分钟内</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const discoverChart = echarts.init(document.getElementById('discoverChart'));
+        discoverChart.setOption({ backgroundColor: 'transparent', tooltip: { trigger: 'axis', backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, xAxis: { type: 'category', data: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'], axisLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }, axisLabel: { color: '#4a6a8a', fontSize: 10 } }, yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(0,212,255,0.05)' } }, axisLabel: { show: false } }, series: [{ type: 'line', data: [5, 3, 12, 28, 35, 32, 13], smooth: true, symbol: 'none', lineStyle: { color: '#00d4ff', width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(0,212,255,0.3)' }, { offset: 1, color: 'rgba(0,212,255,0)' }]) } }] });
+
+        const diagnoseChart = echarts.init(document.getElementById('diagnoseChart'));
+        diagnoseChart.setOption({ backgroundColor: 'transparent', tooltip: { backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, series: [{ type: 'pie', radius: ['50%', '75%'], avoidLabelOverlap: false, label: { show: false }, data: [{ value: 72, name: '<1分钟', itemStyle: { color: '#00ff88' } }, { value: 18, name: '1-5分钟', itemStyle: { color: '#00d4ff' } }, { value: 8, name: '>5分钟', itemStyle: { color: '#ff6b6b' } }] }] });
+
+        const resolveChart = echarts.init(document.getElementById('resolveChart'));
+        resolveChart.setOption({ backgroundColor: 'transparent', tooltip: { trigger: 'axis', backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, xAxis: { type: 'category', data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'], axisLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }, axisLabel: { color: '#4a6a8a', fontSize: 10 } }, yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(0,212,255,0.05)' } }, axisLabel: { show: false } }, series: [{ type: 'line', data: [25, 22, 20, 19, 18, 17, 18.5], smooth: true, symbol: 'none', lineStyle: { color: '#00ff88', width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(0,255,136,0.3)' }, { offset: 1, color: 'rgba(0,255,136,0)' }]) } }] });
+
+        const complianceChart = echarts.init(document.getElementById('complianceChart'));
+        complianceChart.setOption({ backgroundColor: 'transparent', tooltip: { trigger: 'axis', backgroundColor: 'rgba(10,15,26,0.95)', borderColor: 'rgba(0,212,255,0.3)', textStyle: { color: '#e8f4ff' } }, xAxis: { type: 'category', data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'], axisLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }, axisLabel: { color: '#4a6a8a', fontSize: 10 } }, yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(0,212,255,0.05)' } }, axisLabel: { show: false }, max: 100 }, series: [{ type: 'line', data: [92, 94, 95, 93, 96, 97, 96.8], smooth: true, symbol: 'none', lineStyle: { color: '#ffd700', width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(255,215,0,0.3)' }, { offset: 1, color: 'rgba(255,215,0,0)' }]) } }] });
+
+        window.addEventListener('resize', () => { discoverChart.resize(); diagnoseChart.resize(); resolveChart.resize(); complianceChart.resize(); });
+    </script>
+</body>
+</html>
